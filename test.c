@@ -26,7 +26,7 @@ void sink_callback(pa_context *c, const pa_sink_info *i, int eol, void *userdata
         ready |= GOT_SINKS;
         return;
     }
-    printf("s %d: %s\n", i->index, i->name);
+    printf("s %d: %s, '%s'\n", i->index, i->name, i->description);
 }
 
 // use pa_context_get_sink_input_list() to get all sink inputs
