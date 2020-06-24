@@ -4,7 +4,7 @@ LDLIBS=-lpulse
 
 CFLAGS=-g
 
-all: test
+all: test paoutput
 
 test:
 	gcc -o test -g -lpulse test.c
