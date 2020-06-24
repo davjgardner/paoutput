@@ -33,26 +33,52 @@ pa_sink_input_info sink_inputs[N_SINK_INPUTS];
 
 enum action action;
 int sink_index;
+
 int done = 0;
 
+#define DONE 3
+#define DEFAULT_SET 1
+#define SINKS_MOVED 2
+
+void context_success_callback(pa_context *c, int success, void *userdata) {
+    if (!success) dprintf(2, "Failed to move sink input %d to new sink.\n", (int) userdata);
+}
+
+void sink_context_success_callback(pa_context *c, int success, void *userdata) {
+    if (!success) dprintf(2, "Failed to set default sink.\n");
+    done |= DEFAULT_SET;
+}
+
 void sink_callback(pa_context *c, const pa_sink_info *i, int eol, void *userdata) {
-    if (sink_end != N_SINKS && i != NULL) {
-        memcpy(&sinks[sink_end], i, sizeof(pa_sink_info));
-        sink_end++;
-    }
-    if (i == NULL) {
-        if (action == GET) {
+    if (action == GET) {
+        if (sink_end != N_SINKS && i != NULL) {
+            memcpy(&sinks[sink_end], i, sizeof(pa_sink_info));
+            sink_end++;
+        }
+        if (i == NULL) {
             for (int i = 0; i < sink_end; i++) {
                 printf("%d: %s\n", sinks[i].index, sinks[i].description);
             }
-            done = 1;
+            done = DONE;
             return;
         }
     }
+    if (action != GET && i != NULL) {
+        pa_operation *o = pa_context_set_default_sink(c, i->name, sink_context_success_callback, userdata);
+        if (!o) dprintf(2, "Failed to set default sink.\n");
+    }
+
 }
 
 void sink_input_callback(pa_context *c, const pa_sink_input_info *i, int eol, void *userdata) {
-
+    if (i != NULL) {
+        pa_operation *o = pa_context_move_sink_input_by_index(c, i->index, sink_index,
+                                                              context_success_callback,
+                                                              (void*) (i->index));
+        if (!o) dprintf(2, "Failed to move sink input %d: %s\n", i->index, i->name);
+    } else {
+        done |= SINKS_MOVED;
+    }
 }
 
 void context_state_callback(pa_context *c, void *userdata) {
@@ -64,12 +90,14 @@ void context_state_callback(pa_context *c, void *userdata) {
         break;
     case PA_CONTEXT_READY:
         {
-            pa_operation *o1 = pa_context_get_sink_info_list(c, sink_callback, userdata);
-            if (!o1) dprintf(2, "Failed to get sink info.\n");
-
-            if (action != GET) {
-                pa_operation *o2 = pa_context_get_sink_input_info_list(c, sink_input_callback, userdata);
-                if (!o2) dprintf(2, "Failed to get sink info.\n");
+            if (action == GET) {
+                pa_operation *o = pa_context_get_sink_info_list(c, sink_callback, userdata);
+                if (!o) dprintf(2, "Failed to get sink info.\n");
+            } else {
+                pa_operation *o = pa_context_get_sink_info_by_index(c, sink_index, sink_callback, userdata);
+                if (!o) dprintf(2, "Failed to get sink info.\n");
+                o = pa_context_get_sink_input_info_list(c, sink_input_callback, userdata);
+                if (!o) dprintf(2, "Failed to get sink input info.\n");
             }
         }
         break;
@@ -93,11 +121,9 @@ int main(int argc, char **argv) {
     } else if (strncmp(argv[1], "-s", 2) == 0) {
         action = (argc == 2)? SET_STDIN : SET;
         if (action == SET) {
-            printf("%s\n", argv[2]);
             sink_index = strtol(argv[2], NULL, 10);
         } else {
             scanf("%d", &sink_index);
-            printf("index = %d\n", sink_index);
         }
     } else {
         printf("%s", usage_string);
@@ -125,7 +151,7 @@ int main(int argc, char **argv) {
     }
 
     int r;
-    while (!done) {
+    while (done != DONE) {
         pa_mainloop_iterate(ml, 0, &r);
     }
 }
