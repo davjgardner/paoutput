@@ -3,7 +3,8 @@
  * - list output sinks
  * - list all sink sources
  * - display output select and get user response
- * - use `pa_move_source_output_by_name` to move all sink sources to new sink
+ * - use `pa_context_move_sink_input_by_name` to move all sink sources to new sink
+ * - use `pa_context_set_default_sink` to set sink for new streams
  */
 
 /* extensions
