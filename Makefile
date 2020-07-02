@@ -4,14 +4,11 @@ LDLIBS=-lpulse
 
 CFLAGS=-g
 
-all: test paoutput
-
-test:
-	gcc -o test -g -lpulse test.c
+all: paoutput
 
 paoutput:
 
 clean:
-	rm -f *.o test paoutput
+	rm -f *.o paoutput
 
 .PHONY: all clean
